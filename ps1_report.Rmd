@@ -1,0 +1,316 @@
+---
+title: "SF-seq QAA"
+output:
+  html_document: default
+  html_notebook: default
+---
+
+```{r setup, echo=FALSE}
+library(knitr)
+library(ggpubr)
+library("dplyr")
+library("ggplot2")
+```
+
+
+**Assigned Files**
+
+34_4H_both      11_2H_both
+
+# Part 1 - Quality
+
+## (1) FastQC of the reads.
+
+Using FastQC on Talapas, produce plots of quality score distributions for forward and reverse reads. Also, produce plots of the per-base N content, and comment on whether or not they are consistent with the quality score plots.
+
+**Run FastQC**
+```
+fastqc /projects/bgmp/2017_sequencing/demultiplexed/34_4H_both_S24_L008_R* /projects/bgmp/2017_sequencing/demultiplexed/11_2H_both_S9_L008_R* -o jobs/624_ps1/  
+```
+
+
+```{r, out.width="50%"}
+myimages<-list.files("/home/christian/gdrive/School/bi624/ps1/mdw/", pattern = "11_2H*", full.names = TRUE)
+include_graphics(myimages)
+```
+
+___
+
+**Statistics for Library 11_2H**	**A)** Read 1 N Content Per Base	**B)** Read 1 Quality Score Per Base	**C)** Read 2 N Content Per Base	**D)** Read 2 Quality Score Per Base
+
+___
+
+```{r, out.width="50%"}
+myimages<-list.files("/home/christian/gdrive/School/bi624/ps1/mdw/", pattern = "34_4H*", full.names = TRUE)
+include_graphics(myimages)
+```
+
+___
+
+**Statistics for Library 34_4H**   **A)** Read 1 N Content Per Base   **B)** Read 1 Quality Score Per Base   **C)** Read 2 N Content Per Base   **D)** Read 2 Quality Score Per Base
+
+___
+
+*The small N content in the begining of the reads does seem to be reflected in the quality distribution of the reads. FastQC is faster, probably because it is written in a compiled language.*
+
+## (2) Personal Quality Plots
+
+Run your quality score plotting script from the index hopping assignment. Describe how the FastQC quality score distribution plots compare to your own. If different, propose an explanation. Also, does the runtime differ? If so, why?
+
+**Run Quality Info Collection**
+```
+
+cd ~/jobs/624_ps1
+FASTQ="/projects/bgmp/2017_sequencing/demultiplexed"
+python index_qual.py -1 $FASTQ/11_2H_both_S9_L008_R1_001.fastq.gz -4 $FASTQ/11_2H_both_S9_L008_R2_001.fastq.gz -g -o . 
+python index_qual.py -1 $FASTQ/34_4H_both_S24_L008_R1_001.fastq.gz -4 $FASTQ/34_4H_both_S24_L008_R2_001.fastq.gz -g -o .
+
+```
+
+**Read in and print metadata**
+```{r}
+library(jsonlite)
+library(reshape2)
+base11=fromJSON('/home/christian/gdrive/School/bi624/ps1/11_2H_result')
+base34=fromJSON('/home/christian/gdrive/School/bi624/ps1/34_4H_results')
+qual11=base11$qual_info
+rd_avg11=t(qual11$read_avg_dist)
+qual34=base34$qual_info
+rd_avg34=t(qual34$read_avg_dist)
+print(base11$metadata)
+print(base34$metadata)
+```
+
+```{r}
+rdf_melt11 <- melt(rd_avg11)
+rdf_melt34 <- melt(rd_avg34)
+
+rr1 <- ggplot(data=subset(rdf_melt11, Var2==1 & value != is.na(Var2)), aes(x=Var1, y=value))+
+ geom_col(color = "black")+
+ scale_y_log10()+
+ xlab("Avg Phred Per Read")+ylab("Counts")
+
+rr2 <- ggplot(data=subset(rdf_melt11, Var2==2 & value != is.na(Var2)), aes(x=Var1, y=value))+
+ geom_col(width = 1, color = "black")+
+ scale_y_log10()+
+ xlab("Avg Phred Per Read")+ylab("Counts")
+
+rr3 <- ggplot(data=subset(rdf_melt34, Var2==1 & value != is.na(Var2)), aes(x=Var1, y=value))+
+ geom_col(color = "black")+
+ scale_y_log10()+
+ xlab("Avg Phred Per Read")+ylab("Counts")
+
+rr4 <- ggplot(data=subset(rdf_melt34, Var2==2 & value != is.na(Var2)), aes(x=Var1, y=value))+
+ geom_col(width = 1, color = "black")+
+ scale_y_log10()+
+ xlab("Avg Phred Per Read")+ylab("Counts")
+
+pos_melt11=melt(qual11$pos_avg_dist)
+pos_melt11=transform(pos_melt11, i = ave(L1, L1, FUN = seq_along))
+pos_melt34=melt(qual34$pos_avg_dist)
+pos_melt34=transform(pos_melt34, i = ave(L1, L1, FUN = seq_along)) 
+
+pr1 <- ggplot(data=subset(pos_melt11, L1==1), aes(x=i, y=value))+
+ geom_col(width = 1, color = "black")+
+ xlab("Position")+ylab("Avg Base Phred")
+
+pr2 <- ggplot(data=subset(pos_melt11, L1==2), aes(x=i, y=value))+
+ geom_col(width = 1, color = "black")+
+ xlab("Position")+ylab("Avg Base Phred")
+
+pr3 <- ggplot(data=subset(pos_melt34, L1==1), aes(x=i, y=value))+
+ geom_col(width = 1, color = "black")+
+ xlab("Position")+ylab("Avg Base Phred")
+
+pr4 <- ggplot(data=subset(pos_melt34, L1==2), aes(x=i, y=value))+
+ geom_col(width = 1, color = "black")+
+ xlab("Position")+ylab("Avg Base Phred")
+```
+**Average Score per Read**
+```{r, echo=FALSE, fig.width=12}
+ggarrange(rr1, rr2, rr3, rr4 + rremove("x.text"), 
+          labels = c("11_4H_R1", "11_4H_R2", "34_2H_R1", "34_2H_R2"),
+          ncol = 2, nrow = 2)
+```
+
+___
+
+**Average Score per Base Position** The average phred score per base position in the reads. Note that the method of calculating the average was $m_n=m_{n-1}+{a_n-m_{n-1} \over n}$
+___
+
+```{r, echo=FALSE, fig.width=12}
+ggarrange(pr1, pr2, pr3, pr4 + rremove("x.text"), 
+          labels = c("11_4H_R1", "11_4H_R2", "34_2H_R1", "34_2H_R2"),
+          ncol = 2, nrow = 2)
+
+```
+
+___
+
+**Histogram of Average Score per Base Position** Note that the method of calculating the average was $m_n=m_{n-1}+{a_n-m_{n-1} \over n}$
+
+___
+
+*As far as the quality per base the two programs show the same trend. The only differance is that Read 2 was flipped in my plots.*
+
+# Part 2 – Adaptor trimming comparison
+
+## (1) Adapter Trimming
+Look into the adaptor trimming options for cutadapt, process_shortreads, and Trimmomatic (all on Talapas), and briefly describe the differences. Pick one of these to properly trim adapter sequences. Use default settings. What proportion of reads (both forward and reverse) was trimmed?
+        
+**cutadapt** A python program that finds and removes adapter sequences, primers, poly-A tails and other types of unwanted sequence in an error-tolerant way from high-throughput sequencing reads. Also, multiplexed, paired-end reads and colorspace data is supported.
+
+**process_shortreads** Is a part of the Stacks suite, which quality checks and corrects tags and demultipledxes them. Then uses a sliding window approch to trim data.
+
+**Trimmomatic** A Java program that has a variety of trimming algorithms, such as MAXINFO which maximizes length and quality. It works on both paired and single reads.
+
+*Used cutadapt*
+```
+#!/bin/bash
+#SBATCH --partition=short        ### Partition (like a queue in PBS)
+#SBATCH --job-name=cutadapt      ### Job Name
+#SBATCH --output=cut.out         ### File in which to store job output
+#SBATCH --error=cut.err          ### File in which to store job error messages
+#SBATCH --time=0-23:59:00       ### Wall clock time limit in Days-HH:MM:SS
+#SBATCH --nodes=1               ### Node count required for the job
+#SBATCH --ntasks-per-node=28     ### Nuber of tasks to be launched per Node
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=bio.erikson@gmail.com
+
+FASTQ="/projects/bgmp/2017_sequencing/demultiplexed"
+ml easybuild  icc/2017.1.132-GCC-6.3.0-2.27  impi/2017.1.132 cutadapt/1.14-Python-2.7.13
+cutadapt \
+            -a GATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNNNATCTCGTATGCCGTCTTCTGCTTG \
+            -A GATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTNNNNNNNNGTGTAGATCTCGGTGGTCGCCGTATCATT \ 
+            $FASTQ/11_2H_both_S9_L008_R1_001.fastq.gz\
+            $FASTQ/11_2H_both_S9_L008_R2_001.fastq.gz \
+            -o trimmed_11_2H.1.fastq.gz -p trimmed_11_2H.2.fastq.gz
+cutadapt \
+            -a GATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNNNATCTCGTATGCCGTCTTCTGCTTG \
+            -A GATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTNNNNNNNNGTGTAGATCTCGGTGGTCGCCGTATCATT \
+            $FASTQ/34_4H_both_S9_L008_R1_001.fastq.gz\
+            $FASTQ/34_4H_both_S9_L008_R2_001.fastq.gz \
+            -o trimmed_34_4H.1.fastq.gz -p trimmed_34_4H.2.fastq.gz
+```
+
+Sanity check: Use your Unix skills to search for the adapter sequences in your datasets and confirm the expected sequence orientations.
+
+```
+zcat 11_2H_both_S9_L008_R2_001.fastq.gz | grep GATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT | wc -l #rev_sen_r2
+27801
+zcat 11_2H_both_S9_L008_R1_001.fastq.gz | grep GATCGGAAGAGCACACGTCTGAACTCCAGTCAC | wc -l #anti_r1
+24633
+```
+
+## (2) Plots of Length of Adapter Trimmed Reads
+Plot the trimmed read length distributions for both forward and reverse reads (on the same plot). If necessary, consult Assignment 5 (Block 1) from Bi 623 to refresh your memory.
+
+```
+zcat ./trimmed_11_2h.1.fasta.gz| sed -n '2~4p' | awk 'BEGIN{SEQ=0};/./{print length($0)};'| sort -g | uniq -c > 11_2h_r1.len
+zcat ./trimmed_11_2h.2.fasta.gz| sed -n '2~4p' | awk 'BEGIN{SEQ=0};/./{print length($0)};'| sort -g | uniq -c > 11_2h_r2.len'
+zcat ./trimmed_34_4h.1.fasta.gz| sed -n '2~4p' | awk 'BEGIN{SEQ=0};/./{print length($0)};'| sort -g | uniq -c > 34_4h_r1.len
+zcat ./trimmed_34_4h.2.fasta.gz| sed -n '2~4p' | awk 'BEGIN{SEQ=0};/./{print length($0)};'| sort -g | uniq -c > 34_4h_r2.len
+```
+```{r}
+len1=cbind(read.table('~/gdrive/School/bi624/ps1/11_2h_r1.len', col.names=c('count', 'len')), set='S11_2H_R1')
+len2=cbind(read.table('~/gdrive/School/bi624/ps1/11_2h_r2.len', col.names=c('count', 'len')), set='S11_2H_R2')
+len3=cbind(read.table('~/gdrive/School/bi624/ps1/34_4h_r1.len', col.names=c('count', 'len')), set='S34_4H_R1')
+len4=cbind(read.table('~/gdrive/School/bi624/ps1/34_4h_r2.len', col.names=c('count', 'len')), set='S34_4H_R2')
+lens=rbind(len1, len2, len3, len4)
+ggplot(data=lens, mapping = aes(x=len, y=count, color=set))+
+geom_point(alpha=0.5)+
+scale_y_log10()
+```
+
+![](/home/christian/gdrive/School/bi624/ps1/mdw/frag11.png)
+
+![](/home/christian/gdrive/School/bi624/ps1/mdw/frag34.png)
+
+## (3) Comparison to Fragment Analysis
+
+Briefly describe whether the adapter trimming results are consistent with the insert size distributions for your libraries. The size distribution information is in the Fragment Analyzer trace file on Github.
+
+*No the results don't appear to be consistant, as there isn't enough insert of less of 100 to acount for all the trimming. Also I expected library 11 to have more trimming than 34 as it contained adapter dimmers*
+
+# Part 3 – rRNA reads and strand-specificity
+
+## (1) Proportion of Reads Aligning to rRNA
+Find publicly available mouse rRNA sequences and generate a gsnap database from them. Align the SF-Seq reads to your mouse rRNA database and report the proportion of reads that likely came from rRNAs.
+```
+python ~/gdrive/lab_book/bio_info/fast_filter.py -g -r gene_biotype:rRNA -f ~/Downloads/Mus_musculus.GRCm38.ncrna.fa.gz > mus_rRNA.fa
+
+easybuild  ifort/2017.1.132-GCC-6.3.0-2.27  impi/2017.1.132 GMAP-GSNAP/2017-06-20
+
+gmap_build -d ensembl_rrna_mus.38 mus_rRNA.fa -D ~/gmap/ 
+
+python ~/pairend_repair.py -1 trimmed_11_2H.1.fastq.gz -2 trimmed_11_2H.2.fastq.gz -g
+python ~/pairend_repair.py -1 trimmed_34_4H.1.fastq.gz -2 trimmed_34_4H.2.fastq.gz -g
+
+gsnap -D ~/gmap -d ensembl_rrna_mus.38 -N 1 -A sam -B 4 -m 20 -t 28 --split-output 11_2H_gsnap  ~/jobs/624_ps1/trimmed_11_2H.1.fastq.gz_repaired ~/jobs/624_ps1/trimmed_11_2H.2.fastq.gz_repaired --allow-pe-name-mismatch  --orientation=RF
+gsnap -D ~/gmap -d ensembl_rrna_mus.38 -N 1 -A sam -B 4 -m 20 -t 28 --split-output 34_4H_gsnap  ~/jobs/624_ps1/trimmed_34_4H.1.fastq.gz_repaired ~/jobs/624_ps1/trimmed_34_4H.2.fastq.gz_repaired --allow-pe-name-mismatch --orientation=RF
+```
+
+```
+wc 34_4H_gsnap.* -l
+       364 34_4H_gsnap.concordant_mult
+       358 34_4H_gsnap.concordant_transloc
+       498 34_4H_gsnap.concordant_uniq
+     23458 34_4H_gsnap.halfmapping_mult
+       358 34_4H_gsnap.halfmapping_transloc
+    151810 34_4H_gsnap.halfmapping_uniq
+  17872002 34_4H_gsnap.nomapping
+       358 34_4H_gsnap.paired_mult
+       370 34_4H_gsnap.paired_uniq_inv
+       358 34_4H_gsnap.paired_uniq_long
+       508 34_4H_gsnap.paired_uniq_scr
+       361 34_4H_gsnap.unpaired_mult
+       358 34_4H_gsnap.unpaired_transloc
+       496 34_4H_gsnap.unpaired_uniq
+  18051657 total
+wc 11_2H_gsnap.* -l
+        358 11_2H_gsnap.concordant_mult
+        358 11_2H_gsnap.concordant_transloc
+      16698 11_2H_gsnap.concordant_uniq
+       2568 11_2H_gsnap.halfmapping_mult
+        358 11_2H_gsnap.halfmapping_transloc
+    2051964 11_2H_gsnap.halfmapping_uniq
+   33739829 11_2H_gsnap.nomapping
+        358 11_2H_gsnap.paired_mult
+        556 11_2H_gsnap.paired_uniq_inv
+        358 11_2H_gsnap.paired_uniq_long
+      15394 11_2H_gsnap.paired_uniq_scr
+        391 11_2H_gsnap.unpaired_mult
+        358 11_2H_gsnap.unpaired_transloc
+        777 11_2H_gsnap.unpaired_uniq
+   35830325 total
+```
+   
+*The total poroportion of reads mapped in someway to rRNA in 34_4H is `r 1-(17872002/18051657)`*
+
+*The total poroportion of reads mapped in someway to rRNA in 11_2H is `r 1-(33739829/35830325)`*
+
+
+## (2) Strand Specificity
+Demonstrate convincingly that the SF-Seq data are from “strand-specific” RNA-Seq libraries. There are a number of possible strategies to address this problem, but you need only implement one. Report your evidence in numeric and graphical (e.g. a plot) forms.
+
+*Prove strand specificity by mapping reads to ensembl cDNA using gmap, and look at how the reads are orientated in the alignment. The vast majority should be '+'* 
+
+```
+srun --mem 64000 zcat 34_4H_both_S24_L008_R2_001.fastq.gz | head -400000 | gmap -S -D ~/Gmap -d ensembl_cdna_mus.38 --invertmode=0 -f 3  | grep [^#] > 34_4H.2.gmap_strand.gff
+srun --mem 64000 zcat 11_2H_both_S9_L008_R2_001.fastq.gz | head -400000 | gmap -S -D ~/Gmap -d ensembl_cdna_mus.38 --invertmode=0 -f 3  | grep [^#] > 11_2H.2.gmap_strand.gff 
+
+cut -f7 34_4H.2.gmap_strand.gff | sort | uniq -c
+  11690 -
+ 251696 +
+cut -f7 11_2H.2.gmap_strand.gff | sort | uniq -c
+   7874 -
+ 229356 +
+```
+
+```{r}
+strand=data.frame(set=c(rep('34_4H.2',2),rep('11_2H.2',2)), strd=c('+','-','+','-'), cnt=c(241696,11690,229356,7874))
+ggplot(data = strand,mapping = aes(x=set,y=cnt, group=strd, fill=strd))+
+	geom_col(position = 'dodge')
+```
+
+
